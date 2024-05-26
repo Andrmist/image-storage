@@ -10,7 +10,7 @@ import (
 
 func main() {
 	cr := cron.New()
-	cr.AddFunc("0 0 0 * * *", DeleteWorker)
+	// cr.AddFunc("0 0 0 * * *", DeleteWorker)
 	cr.Start()
 	HttpWorker()
 	log.Println("http worker started")
