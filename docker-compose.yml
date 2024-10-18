@@ -5,7 +5,4 @@ services:
     build: .
     ports:
       - "8081:8081"
-    volumes:
-      - ./photos:/app/photos
-    environment:
-      - HOSTNAME=
+    env_file: ./.env

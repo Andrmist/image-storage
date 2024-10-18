@@ -1,21 +1,25 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/google/uuid"
-	"github.com/pkg/errors"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
+	"github.com/minio/minio-go/v7"
+	"github.com/pkg/errors"
 )
 
-func HttpWorker() {
-	HostName := os.Getenv("HOSTNAME")
+func HttpWorker(ctx context.Context, minioClient *minio.Client) {
+	minioEndpoint := os.Getenv("MINIO_PUBLIC_ENDPOINT")
+	minioBucket := os.Getenv("MINIO_BUCKET")
+	minioPrefix := os.Getenv("MINIO_PREFIX_PATH")
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
@@ -37,19 +41,12 @@ func HttpWorker() {
 		defer file.Close()
 		id := uuid.New()
 
-		path := filepath.Join("photos", fmt.Sprintf("%v%v", id, filepath.Ext(handler.Filename)))
-		dst, err := os.Create(path)
-		defer dst.Close()
-		if err != nil {
+		path := filepath.Join(minioPrefix, fmt.Sprintf("%v%v", id, filepath.Ext(handler.Filename)))
+		if _, err = minioClient.PutObject(ctx, minioBucket, path, file, handler.Size, minio.PutObjectOptions{}); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		if _, err := io.Copy(dst, file); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Write([]byte(fmt.Sprintf("%v/%v", HostName, path)))
+		w.Write([]byte(fmt.Sprintf("%s/%s", minioEndpoint, filepath.Join(minioBucket, path))))
 	})
 	go func() {
 		if err := http.ListenAndServe("0.0.0.0:8081", r); err != nil {
