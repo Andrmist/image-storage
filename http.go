@@ -48,6 +48,24 @@ func HttpWorker(ctx context.Context, minioClient *minio.Client) {
 		}
 		w.Write([]byte(fmt.Sprintf("%s/%s", minioEndpoint, filepath.Join(minioBucket, path))))
 	})
+	r.Get("/url", func(w http.ResponseWriter, r *http.Request) {
+		url := r.URL.Query().Get("url")
+		log.Println(url)
+		res, err := http.Get(url)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		id := uuid.New()
+
+		path := filepath.Join(minioPrefix, fmt.Sprintf("%v%v", id, filepath.Ext(url)))
+		if _, err = minioClient.PutObject(ctx, minioBucket, path, res.Body, res.ContentLength, minio.PutObjectOptions{}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte(fmt.Sprintf("%s/%s", minioEndpoint, filepath.Join(minioBucket, path))))
+	})
 	go func() {
 		if err := http.ListenAndServe("0.0.0.0:8081", r); err != nil {
 			log.Fatal(errors.Wrap(err, "failed to create http server"))
